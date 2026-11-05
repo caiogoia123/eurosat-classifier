@@ -54,6 +54,9 @@ print("Parâmetros:", sum(p.numel() for p in model.parameters()))
 # ---------- Loss e otimizador ----------
 loss_fn   = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+best_val_loss = float("inf")
+count = 0
+patience = 5
 
 # ---------- Treino + validação ----------
 for epoch in range(40):
@@ -62,7 +65,7 @@ for epoch in range(40):
     # ----- treino -----
     model.train()
     train_loss = 0
-    train_correct = 0                                                   # ← novo
+    train_correct = 0                                                   
     for imgs, labels in train_loader:
         imgs, labels = imgs.to(device), labels.to(device)
         preds = model(imgs)
@@ -71,23 +74,39 @@ for epoch in range(40):
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        train_correct += (preds.argmax(dim=1) == labels).sum().item()   # ← novo
+        train_correct += (preds.argmax(dim=1) == labels).sum().item()   
 
     # ----- validação -----
     model.eval()
-    val_loss = 0                                                        # ← novo
+    val_loss = 0                                                        
     val_correct = 0
     with torch.no_grad():
         for imgs, labels in val_loader:
             imgs, labels = imgs.to(device), labels.to(device)
             preds = model(imgs)                                         # ← guardar as notas
-            val_loss += loss_fn(preds, labels).item()                   # ← novo
+            val_loss += loss_fn(preds, labels).item()                   
             val_correct += (preds.argmax(dim=1) == labels).sum().item()
-
+    
+    val_loss = val_loss / len(val_loader)
+    
     print(f"Época {epoch:2d} | "
-          f"treino: loss {train_loss / len(train_loader):.3f}, acc {train_correct / len(train_ds):.2%} | "
-          f"val: loss {val_loss / len(val_loader):.3f}, acc {val_correct / len(val_ds):.2%} | "
-          f"{time.time() - start:.0f}s")
+        f"treino: loss {train_loss / len(train_loader):.3f}, acc {train_correct / len(train_ds):.2%} | "
+        f"val: loss {val_loss:.3f}, acc {val_correct / len(val_ds):.2%} | "
+        f"{time.time() - start:.0f}s")
+
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        count = 0
+        torch.save(model.state_dict(), "models/best_model.pt")
+    else:
+        count += 1
+    
+    if count == patience:
+        print(f"Early stopping: {patience} épocas sem melhora. Melhor val_loss = {best_val_loss:.3f}")
+        break
+
+# ---------- Carregar o melhor modelo ----------
+model.load_state_dict(torch.load("models/best_model.pt"))
 
 # ---------- Testar uma imagem ----------
 label_map = json.loads((DATA_DIR / "label_map.json").read_text())
