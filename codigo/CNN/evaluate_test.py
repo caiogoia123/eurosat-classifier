@@ -57,23 +57,73 @@ model.eval()
 test_loss = 0                                                        
 test_correct = 0
 loss_fn = nn.CrossEntropyLoss()
-prev_list = []
-res_list = []
+all_preds = []
+all_labels = []
 
 with torch.no_grad():
     for imgs, labels in test_loader:
         imgs, labels = imgs.to(device), labels.to(device)
-        preds = model(imgs)                              
+        preds = model(imgs)         
+        guess = preds.argmax(dim=1)                     
+        
         test_loss += loss_fn(preds, labels).item()                   
-        test_correct += (preds.argmax(dim=1) == labels).sum().item()
-        print(labels)           
+        test_correct += (guess == labels).sum().item()
+        
+        all_preds.append(guess)
+        all_labels.append(labels)
+
+all_preds = torch.cat(all_preds)
+all_labels = torch.cat(all_labels)
+
+print(f"Formato das predição : {all_preds.shape} | Formato das Respostas : {all_labels.shape}")
+
+# --------- Matriz Confusao ---------
+
+matriz_confusao =  torch.zeros(10, 10, dtype=torch.int64)
+# print(matriz_confusao)
+for real, previsto in zip(all_labels,all_preds):
+    matriz_confusao[real,previsto] +=1
+print("-------- Matriz de Confusão --------")
+print(f"{matriz_confusao}")
+
+
+# --------- Acuracia ---------
+
+total_por_linha = matriz_confusao.sum(dim=1)
+print(f"Total por Linhas: {total_por_linha}")
+lista_acertos = torch.zeros(10,dtype=torch.int64)
+for i in range(0,10,1):
+    lista_acertos [i]= matriz_confusao[i,i]
+    # print(valor)
+print(f"Quantidade de acertos por classe: {lista_acertos}")
+
+idx_label_map = {v: k for k, v in label_map.items()}
+
+acuracia = lista_acertos / total_por_linha
+# print(f"Acuracia:{acuracia}")
+
+print("-------- Acurácia --------")
+for i in range(0,10,1):
+    print(f"{idx_label_map[i]} | Acurácia: {acuracia[i]:.2%}")
+
+
+# --------- Precisao ---------
+
+total_por_coluna = matriz_confusao.sum(dim=0)
+# print(f"Total por Colunas: {total_por_coluna}")
+precisao = lista_acertos / total_por_coluna
+# print(f"Precisão:{precisao}")
+
+print("-------- Precisão --------")
+for i in range(0,10,1):
+    print(f"{idx_label_map[i]} | Precisão : {precisao[i]:.2%}")
+
+
+# --------- Resultado Final ---------
 
 test_loss = test_loss / len(test_loader)
-
+print("-------- Resultado Final --------")
 print(f"Teste: loss {test_loss:.3f}, acc {test_correct / len(test_ds):.2%}")
-print(label_map)
-idx_label_map = {v: k for k, v in label_map.items()}
-print(idx_label_map)
 '''
 
 # ---------- Carregar o melhor modelo ----------
